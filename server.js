@@ -87,13 +87,8 @@ app.set('views', __dirname + '/views');
 // Створюємо парсер для даних application/x-www-form-urlencoded
 const urlencodedParser = express.urlencoded({limit: '50mb', extended: true});
 
-// Використовуємо swagger-jsdoc для генерації специфікації OpenAPI (Swagger) на основі конфігурації, визначеної у файлі swaggerConfig.js. Функція swaggerJsdoc аналізує JSDoc-коментарі у ваших маршрутах та створює JSON-файл, який описує ваш API відповідно до стандарту OpenAPI.
-const specs = swaggerJsdoc(swaggerConfig.options); 
-// Використовуємо swagger-ui-express для створення маршруту /api-docs, який обслуговує документацію API у вигляді веб-сторінки.
-app.use('/api-docs', 
-    swaggerUi.serve, 
-    swaggerUi.setup(specs)
-);
+// Ініціалізуємо Swagger UI через окремий модуль.
+swaggerConfig.initSwagger(app);
 
 // var storage = multer.diskStorage({
 //     destination: function (req, file, cb) {
