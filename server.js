@@ -9,7 +9,7 @@
 // DataCentre -185.250.23.89:10400 (Domain name: rro.ics-market.com.ua)
 //const dbConnectionString = 'mongodb://snmp_user:Service_RW@213.160.150.219:10400/snmp_main_db';
 //const KSEFServerConnectionString = 'mongodb://mainUSER:KSEFpswd_2021@213.160.150.219:10400/ksef_main_db';
-const dbConnectionString = 'mongodb://prroBackendUSER:PRROBackendPswd_2026@localhost:27017/prro_backend_db';
+const dbConnectionString = 'mongodb://snmp_user:Service_RW@rro.ics-market.com.ua:10400/snmp_main_db';
 const KSEFServerConnectionString = 'mongodb://mainUSER:KSEFpswd_2021@rro.ics-market.com.ua:10401/ksef_main_db';
 const FirmwareDBConnectionString = 'mongodb://userDB:fWarePSWD_2025@rro.ics-market.com.ua:10400/firmware_db';
 const helmet = require('helmet'); // Helmet допомагає захистити ваші Express-додатки, встановлюючи різні HTTP-заголовки. Це не чарівна куля, але може допомогти!
@@ -30,7 +30,6 @@ const flash = require('express-flash'); // express-flash - це middleware дл�
 const swaggerConfig = require('./modules/swaggerConfig'); // Модуль swaggerConfig.js надає конфігурацію для інтеграції Swagger UI у ваш додаток Express. Він використовує бібліотеки swagger-jsdoc та swagger-ui-express для генерації документації API на основі JSDoc-коментарів у вашому коді та відображення її у вигляді інтерактивного інтерфейсу користувача.
 var Tokens = require('csrf'); // Модуль csrf надає захист від атак CSRF (Cross-Site Request Forgery) у веб-додатках. Він генерує унікальні токени для кожного користувача та перевіряє їх при обробці запитів, щоб переконатися, що запит походить від авторизованого користувача.
 var tokens = new Tokens();
-const csrf = require('csurf'); // Модуль csurf - це middleware для Express, який забезпечує захист від атак CSRF (Cross-Site Request Forgery). Він генерує унікальні токени для кожного користувача та перевіряє їх при обробці запитів, щоб переконатися, що запит походить від авторизованого користувача.
 var passport = require('passport'); // Passport - це middleware для Node.js, який забезпечує аутентифікацію користувачів у веб-додатках. Він підтримує різні стратегії аутентифікації, такі як локальна аутентифікація, OAuth, OpenID та інші, що дозволяє легко інтегрувати аутентифікацію у ваш додаток.
 var utils = require('./modules/utils'); // Модуль utils.js надає допоміжні функції для генерації токенів та випадкових чисел. Він містить функцію generateToken, яка генерує випадковий рядок заданої довжини, використовуючи символи латинського алфавіту та цифри. Функція getRandomInt використовується для отримання випадкового цілого числа у заданому діапазоні.
 var secret = tokens.secretSync();
@@ -88,8 +87,13 @@ app.set('views', __dirname + '/views');
 // Створюємо парсер для даних application/x-www-form-urlencoded
 const urlencodedParser = express.urlencoded({limit: '50mb', extended: true});
 
-// Ініціалізуємо Swagger UI через окремий модуль.
-swaggerConfig.initSwagger(app);
+// Використовуємо swagger-jsdoc для генерації специфікації OpenAPI (Swagger) на основі конфігурації, визначеної у файлі swaggerConfig.js. Функція swaggerJsdoc аналізує JSDoc-коментарі у ваших маршрутах та створює JSON-файл, який описує ваш API відповідно до стандарту OpenAPI.
+const specs = swaggerJsdoc(swaggerConfig.options); 
+// Використовуємо swagger-ui-express для створення маршруту /api-docs, який обслуговує документацію API у вигляді веб-сторінки.
+app.use('/api-docs', 
+    swaggerUi.serve, 
+    swaggerUi.setup(specs)
+);
 
 // var storage = multer.diskStorage({
 //     destination: function (req, file, cb) {
@@ -1038,18 +1042,7 @@ app.use(session({
     cookie: { maxAge: 30 * 60 * 1000 }  // 30 min
   }));
 app.use(flash());
-//app.use(csrf({cookie:true}));
-
-// Настройка csurf с хранением токена в cookie
-const csrfProtection = csrf({
-  cookie: {
-    httpOnly: true, // токен нельзя прочитать из JS
-    secure: false,  // true для HTTPS
-    sameSite: 'strict' // защита от CSRF
-  }
-});
-
-app.use(csrfProtection);
+//app.use(csrf({cookie:true})); 
 
 passport.serializeUser(function(user, done) {
     done(null, user);
@@ -1180,7 +1173,7 @@ passport.deserializeUser(function(obj, done) {
 app.use(require('express-session')({ secret: 'keyboard cat', resave: true, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
-//app.use(passport.authenticate('remember-me',{failureRedirect:'/sign-in'}));
+app.use(passport.authenticate('remember-me',{failureRedirect:'/sign-in'}));
     
 // // error handler
 // app.use((err, req, res, next)=> {
@@ -1233,40 +1226,6 @@ else
     return res.redirect('/sign-in');
 });
     
-
-
-// Эндпоинт для получения CSRF-токена
-/**
- * @openapi
- * /csrf-token:
- *  get:
- *    summary: Получение CSRF-токена
- *   description: Возвращает CSRF-токен для защиты от CSRF-атак.
- *   tags:
- *     - Security
- *  responses:
- *    200:
- *     description: Успешно возвращен CSRF-токен.
- *  
- *  
- */
-app.get('/csrf-token', (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
-});
-
-
-/**
- * @openapi
- * /sign-in:
- *   get:
- *     summary: Отображение страницы входа
- *     description: Возвращает страницу авторизации пользователя.
- *     tags:
- *       - Authentication
- *     responses:
- *       200:
- *         description: Страница входа успешно отдана.
- */
 app.get('/sign-in',function(req,res){
     return res.render('sign-in',{page:'Home', menuId:'home'});
 });
@@ -2182,19 +2141,6 @@ app.get('/rro_flasher', function(req,res){
     }
 });
 
-
-/**
- * @openapi
- * /registration:
- *   get:
- *     summary: Отображение страницы регистрации
- *     description: Возвращает страницу регистрации нового пользователя.
- *     tags:
- *       - Authentication
- *     responses:
- *       200:
- *         description: Страница регистрации успешно отдана.
- */
 app.get('/registration', urlencodedParser, function(req,res){
     // console.log(req.csrfToken());
     // var token = req.csrfToken();
@@ -2203,38 +2149,7 @@ app.get('/registration', urlencodedParser, function(req,res){
     return res.render('registration',{page:'Home', menuId:'home', data:{}, errors:{}, csrfToken:tokens.create(secret)});
     // res.render('registration',{page:'Home', menuId:'home', data:{}, errors:{}});
 });
-   
-/**
- * @openapi
- * /registration:
- *   post:
- *     summary: Регистрация нового пользователя
- *     description: Создает новую учетную запись пользователя.
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *                 description: Имя пользователя
- *               email:
- *                 type: string
- *                 description: Электронная почта пользователя
- *               password:
- *                 type: string
- *                 description: Пароль пользователя
- *               confirm_password:
- *                 type: string
- *                 description: Подтверждение пароля пользователя
- *     responses:
- *       200:
- *         description: Пользователь успешно зарегистрирован.
- */
+    
 app.post('/registration', urlencodedParser,                          
                             check('username')
                                 .not().isEmpty()
@@ -2256,6 +2171,7 @@ app.post('/registration', urlencodedParser,
                             // check('confirm_password', 'Passwords do not match.').custom((value, {req}) => (value === req.body.password))  
                             check('confirm_password', 'Паролі не співпадають.').custom((value, {req}) => (value === req.body.password))  
                                 , function (request, response) {
+
 
     //console.log(request.csrfToken());
     if(!request.body) return response.sendStatus(400);
@@ -2950,7 +2866,7 @@ var mainconnection = mongoose.createConnection(dbConnectionString,{
     // useUnifiedTopology: true, 
     // useNewUrlParser: true,
     // // ssl: false,
-    tls: false,
+    // tls: false,
     // key:  fs.readFileSync("/etc/ssl/mongodb.pem"),
     // cert: fs.readFileSync("/etc/ssl/mongodb.crt"),
     // ca:   fs.readFileSync("/etc/ssl/mongodb-ca.crt"),
