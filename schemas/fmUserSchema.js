@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const FmUserSchema = mongoose.Schema({
     _id:      mongoose.SchemaTypes.ObjectId,
-    username: String,
+    username:   String,
     email:      String,
     rememberMe: {
                  type:Boolean,    
@@ -18,10 +18,11 @@ const FmUserSchema = mongoose.Schema({
                  default: undefined},                        
     isAdmin:    {
                 type: Boolean,
-                default: false},
+                default: false},                
     token:      {
-                type: String, 
-                default: undefined},           
+               type: String, 
+               default: undefined},
+
     
 });
 // compile schema to model
