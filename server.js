@@ -1,15 +1,15 @@
 //const MongoClient = require('mongodb').MongoClient;dbConnectionString
  var fs = require('fs');
  var http = require('http');
+ require('dotenv').config();
 //-- var https = require('https');
-
 //Standard port for MongoDB: 27017
 // Local  -10.215.0.121:27017
 // Remote -213.160.150.219:10400
 // DataCentre -185.250.23.89:10400 (Domain name: rro.ics-market.com.ua)
 //const dbConnectionString = 'mongodb://snmp_user:Service_RW@213.160.150.219:10400/snmp_main_db';
 //const KSEFServerConnectionString = 'mongodb://mainUSER:KSEFpswd_2021@213.160.150.219:10400/ksef_main_db';
-const dbConnectionString = 'mongodb://prroBackendUSER:PRROBackendPswd_2026@localhost:27017/prro_backend_db';
+
 const KSEFServerConnectionString = 'mongodb://mainUSER:KSEFpswd_2021@rro.ics-market.com.ua:10401/ksef_main_db';
 const FirmwareDBConnectionString = 'mongodb://userDB:fWarePSWD_2025@rro.ics-market.com.ua:10400/firmware_db';
 const helmet = require('helmet'); // Helmet допомагає захистити ваші Express-додатки, встановлюючи різні HTTP-заголовки. Це не чарівна куля, але може допомогти!
@@ -30,13 +30,15 @@ const flash = require('express-flash'); // express-flash - це middleware дл�
 const swaggerConfig = require('./modules/swaggerConfig'); // Модуль swaggerConfig.js надає конфігурацію для інтеграції Swagger UI у ваш додаток Express. Він використовує бібліотеки swagger-jsdoc та swagger-ui-express для генерації документації API на основі JSDoc-коментарів у вашому коді та відображення її у вигляді інтерактивного інтерфейсу користувача.
 var Tokens = require('csrf'); // Модуль csrf надає захист від атак CSRF (Cross-Site Request Forgery) у веб-додатках. Він генерує унікальні токени для кожного користувача та перевіряє їх при обробці запитів, щоб переконатися, що запит походить від авторизованого користувача.
 var tokens = new Tokens();
-const csrf = require('csurf'); // Модуль csurf - це middleware для Express, який забезпечує захист від атак CSRF (Cross-Site Request Forgery). Він генерує унікальні токени для кожного користувача та перевіряє їх при обробці запитів, щоб переконатися, що запит походить від авторизованого користувача.
+const csrf = require('@dr.pogodin/csurf'); // Модуль csurf надає захист від атак CSRF (Cross-Site Request Forgery) у веб-додатках Express. Він генерує унікальні токени для кожного користувача та перевіряє їх при обробці запитів, щоб переконатися, що запит походить від авторизованого користувача.
+const cors = require('cors'); // Модуль cors надає middleware для Express, який дозволяє налаштовувати політику CORS (Cross-Origin Resource Sharing) у вашому додатку. CORS визначає, які домени можуть отримувати доступ до ресурсів вашого сервера, що дозволяє контролювати безпеку та доступність вашого API.
 var passport = require('passport'); // Passport - це middleware для Node.js, який забезпечує аутентифікацію користувачів у веб-додатках. Він підтримує різні стратегії аутентифікації, такі як локальна аутентифікація, OAuth, OpenID та інші, що дозволяє легко інтегрувати аутентифікацію у ваш додаток.
 var utils = require('./modules/utils'); // Модуль utils.js надає допоміжні функції для генерації токенів та випадкових чисел. Він містить функцію generateToken, яка генерує випадковий рядок заданої довжини, використовуючи символи латинського алфавіту та цифри. Функція getRandomInt використовується для отримання випадкового цілого числа у заданому діапазоні.
+var mailer = require('./modules/mailer');
 var secret = tokens.secretSync();
-const tokensecret = '$';
-const f_tokensecret ='EsKe28sdsWXd_2@sMc';
-const tokensalt = 'asarERfd14s';
+const tokensecret = process.env.TOKEN_SECRET;
+const f_tokensecret =process.env.F_TOKEN_SECRET;
+const tokensalt = process.env.TOKENSALT;
 var LocalStrategy = require('passport-local').Strategy; // Passport-local - це стратегія аутентифікації для Passport, яка використовує локальну базу даних користувачів для перевірки облікових даних. Вона дозволяє користувачам входити у ваш додаток за допомогою імені користувача та пароля, зберігаючи їх у базі даних на сервері.
 var GoogleStrategy = require( 'passport-google-oauth2' ).Strategy; // Passport-google-oauth2 - це стратегія аутентифікації для Passport, яка дозволяє користувачам входити у ваш додаток за допомогою облікового запису Google. Вона використовує протокол OAuth 2.0 для отримання доступу до інформації про користувача з Google та забезпечує безпечну аутентифікацію без необхідності зберігати паролі користувачів у вашому додатку.
 var moment = require('moment'); // Модуль moment.js надає зручний спосіб роботи з датами та часом у JavaScript. Він дозволяє легко створювати, форматувати, порівнювати та маніпулювати датами та часом, а також підтримує різні часові пояси та локалізації.
@@ -144,10 +146,11 @@ swaggerConfig.initSwagger(app);
 //   }
 
 /**
- * generates random string of characters i.e salt
- * @function
- * @param {number} length - Length of the random string.
+    * generates random string of characters i.e salt
+    * @function
+    * @param {number} length - Length of the random string.
  */
+
 var genRandomString = function(length){
     return crypto.randomBytes(Math.ceil(length/2))
             .toString('hex') /** convert to hexadecimal format */
@@ -156,11 +159,12 @@ var genRandomString = function(length){
 
 
 /**
- * hash password with sha256.
- * @function
- * @param {string} password - List of required fields.
- * @param {string} salt - Data to be validated.
+    * hash password with sha256.
+    * @function
+    * @param {string} password - List of required fields.
+    * @param {string} salt - Data to be validated.
  */
+
 var sha256 = function(password, salt){
     var hash = crypto.createHmac('sha256', salt); /** Hashing algorithm sha512 */
     hash.update(password);
@@ -172,11 +176,12 @@ var sha256 = function(password, salt){
 }
 
 /**
- * hash password with sha512.
- * @function
- * @param {string} password - List of required fields.
- * @param {string} salt - Data to be validated.
+    * hash password with sha512.
+    * @function
+    * @param {string} password - List of required fields.
+    * @param {string} salt - Data to be validated.
  */
+
 var sha512 = function(password, salt){
     var hash = crypto.createHmac('sha512', salt); /** Hashing algorithm sha512 */
     hash.update(password);
@@ -231,6 +236,13 @@ var connectionPassword=function(){
     })
 }
 
+/**
+    * Функція реєстрації нового користувача у базі даних.
+    * @function
+    * @param {object} request - Об'єкт запиту, що містить дані користувача для реєстрації.
+    * @param {object} response - Об'єкт відповіді, що буде використаний для надсилання результатів.
+ */
+
 var registerNewUser = function (request, response){
 
     var query = User.findOne({email: request.body.email});
@@ -238,265 +250,209 @@ var registerNewUser = function (request, response){
     
     query.then(function(doc) {
    
-      //console.log(doc);
-      if(doc==null){
-      // if (typeof doc === 'undefined'){
-          console.log('undefined');
-          // Generate HASH 
-          var salt = genRandomString(16);
-          var passwordData = sha512(request.body.password, salt);
+        //console.log(doc);
+        if(doc==null){
+        // if (typeof doc === 'undefined'){
+            //console.log('undefined');
+            // Generate HASH 
+            var salt = genRandomString(16);
+            var passwordData = sha512(request.body.password, salt);
       
-          // a document instance
-          var curUser = new User({username: request.body.username,
+            // a document instance
+            var curUser = new User({username: request.body.username,
                                   email: request.body.email,
                                   hash: passwordData});
 
-          // save model to database                                            
-          curUser.save(function (err, user) {
-              if (err) {
-                  return console.error(err);
-              }
+            //                                            
+            curUser.save().then (()=> {
           
-              console.log(curUser.name + " saved to user collection.");       
+                console.log(curUser.username + " saved to user collection.");       
 
-              var EMAIL_SECRET = Buffer.from(sha256(tokensecret, tokensalt).passwordHash).toString('base64');
-              console.log(EMAIL_SECRET);
+                var EMAIL_SECRET = Buffer.from(sha256(tokensecret, tokensalt).passwordHash).toString('base64');
+                console.log(EMAIL_SECRET);
+
+                User.findOne({email: request.body.email})
+                    .then(doc => {
+                        if (!doc || !doc._id) {
+                            console.log('Користувача не знайдено після збереження!');
+                            return response.status(400).json({
+                                success: false,
+                                message: 'Користувача не знайдено після збереження!',
+                            });
+                        }
+
+                        const index = doc._id;
+                        console.log('index1 - ' + index);
+
+                        const emailToken = jwt.sign({user: `${index}`}, EMAIL_SECRET);
+                        console.log(emailToken);
+
+                        const url = `${process.env.URL_PREFIX}/confirm/${emailToken}`;
+
+                        const mailOptions = {
+                            from: process.env.EMAIL_SENDER,
+                            to: request.body.email,
+                            subject: 'Підтвердження реєстрації на сайті: https://retailbox-prro.ics-market.com.ua',
+                            html: '<p align = "center"><b> Вітаємо Вас, шановний(-а) ' + request.body.username + '!</b></p><br>' +
+                                'Ви отримали цей лист, оскільки Ваш e-mail був зареєстрований в електронному кабінеті на сайті "https://retailbox-prro.ics-market.com.ua". <br>' +
+                                'Якщо Ви не здійснювали реєстрацію, тоді проігноруйте або видаліть цей лист.<br>' +
+                                'Щоб завершити реєстрацію натисніть кнопку "Підтвердити реєстрацію" нижче та підтвердіть свій e-mail. <br>' +
+                                'Якщо протягом 24 годин Ви не підтвердите свій e-mail, Ваш обліковий запис буде видалено з системи. <br>' +
+                                'Ваш пароль доступу до електронного кабінету: <b>' + request.body.password + '</b>.<br><br>' +
+                                
+                                `<div style="text-align:center"><a href="${url}" style="display:inline-block;padding:10px 12px;background:#1a73e8;color:#ffffff;text-decoration:none;border-radius:4px;">Підтвердити реєстрацію</a></div><br><br>` +
+                                
+                                'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br>' +
+                                'З повагою, адміністрація ПРРО "RetailBox", ТОВ "ІКС-Маркет".<br>' +
+                                '<div style="text-align:left"><img src="cid:logo@ics" alt="Logo" style="max-width:64px;margin-bottom:10px;"></div>',
+                            attachments: [{ filename: 'logo.jpg', path: path.join(__dirname, 'icons', 'logo.jpg'), cid: 'logo@ics' }]
+                        };
+
+                        return mailer.sendMail(mailOptions)
+                            .then(() => response.status(200).json({
+                                success: true,
+                                message: 'Вам надіслано листа, перейдіть за посиланням у ньому для завершення реєстрації!'
+                            }))
+                            .catch(err => {
+                                console.log(err);
+                                return response.status(400).json({
+                                    success: false,
+                                    message: 'Помилка надсилання листа на e-mail користувача: ' + err.message,
+                                });
+                            });
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        return response.status(500).json({
+                            success: false,
+                            message: 'Помилка сервера: ' + err.message
+                        });
+                    });
               
-              var index = undefined;
-              function getUserId (){
-                  User.findOne({email: request.body.email}). then( doc => {
-
-                      index =  doc._id;
-                      console.log('index1 - ' + index);                    
-  
-                      // sync making emailToken
-                      var emailToken = jwt.sign({user:`${index}`}, EMAIL_SECRET);
-                          
-                          console.log(emailToken)
-
-                          // const url = `https://rro.ics-market.com.ua/confirmation/${emailToken}`;
-                          //const url = `https://${getIPAddress()}/confirmation/${emailToken}`;
-                          const url = `http://${getIPAddress()}:3000/confirmation/${emailToken}`;
-
-                          // надіслати листа з паролем на e-mail
-                          var nodemailer = require('nodemailer');
-
-                          var transporter = nodemailer.createTransport({
-                              name: "ics-market.com.ua",
-                                // service: 'gmail',
-                              host: "smtp-relay.gmail.com",//"smtp.gmail.com",
-                              port: 465,
-                              secure: true,
-                              pool: true,
-                                // auth: {
-                                //     user: 'd.vasilenko@ics-market.com.ua',
-                                //     pass: 'grubzpmnpwhgxsbb'
-                                // }
-                          });
-
-                          var mailOptions = {
-                            from: 'rro@ics-market.com.ua',
-                            to: doc.email,
-                            subject: 'Завершення реєстрації на сайті: https://rro.ics-market.com.ua',
-                            html:    '<p align = "center"><b> Доброго дня, шановний(-а) '+ doc.username + '!</b></p><br><br>'+
-
-                                     'Адміністратор сайту \"https://rro.ics-market.com.ua\" зареєстрував Ваш обліковий запис. <br>' +
-                                     'Ваш пароль доступу до сайту: '+request.body.password+'<br>' +
-                                     'Будь ласка, дочекайтесь активації Вашого облікового запису адміністратором сайту.<br>'+
-                                     'Скоро Вам буде надіслано листа про активацію Вашого облікового запису.<br>'+
-                                     'З питань реєстрації та активації можна звертатися до адміністратора: registration@ics-market.com.ua <br><br>'+
-                                                                         
-                                     'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br><br>'+
-
-                                     'З повагою, Адміністрація сайту.'
-                          };
-                
-                          transporter.sendMail(mailOptions, function(error, info){
-                              if (error) {
-                                  console.log(error);
-                              }
-                          });
-                          
-                          var maillist =['registration@ics-market.com.ua'];
-                          User.find({isAdmin: true}). then( doc => {
-
-                            if (doc!=null){
-                                doc.forEach(function(account){
-                                    maillist.push(account.email);
-                                })
-                            }
-                          });
-                        
-                          mailOptions = {
-                              from: 'rro@ics-market.com.ua',
-                              //to: request.body.email,
-                              to: maillist,//'registration@ics-market.com.ua',
-                              subject: 'Підтвердіть реєстрацію нового користувача на сайті: https://rro.ics-market.com.ua',
-                              html:   '<p align="center"><b> Доброго дня, шановний(-а) адміністратор сайту \"https://rro.ics-market.com.ua\"!</b></p><br><br>'+
-
-                                      `Користувач: ${doc.username} з e-mail: ${doc.email} успішно зареєстрований на сайті: https://rro.ics-market.com.ua. <br>` +
-                                      `адміністратором ${request.session.passport.user.username} (e-mail: ${request.session.passport.user.email}). <br>`+  
-
-                                      'Пароль доступу на сайт: <b>'+ request.body.password + '<b><br>' +
-                                      `Цей пароль доступу був також надісланий за адресою ${doc.email} автоматично! <br><br>` +
-
-                                      `Щоб завершити реєстрацію цього користувача, перейдіть будь ласка за цим посиланням: <a href="${url}"> Підтвердити реєстрацію </a><br><br>`+
-
-                                      'Це повідомлення було надіслано Вам автоматично, так як Ви є членом групи адміністраторів сайту.'
-                          };
-                
-                          transporter.sendMail(mailOptions, function(error, info){
-                              if (error) {
-                                  console.log(error);
-                                  return response.render('registration', {                
-                                      page:'Home', 
-                                      menuId:'home',                     
-                                      data: request.body, // { email }
-                                      errors: {
-                                          email: { msg: error} // Message for email
-                                      },
-                                      csrfToken:tokens.create(secret)
-                                  })
-                      
-                              } else {
-                                  console.log('Email sent: ' + info.response);
-                              }
-                          });
-                  
-                          // Success! Make flash message!
-                          //request.flash('success', 'We have sent registering information on your e-mail. Please check your e-mail box.');            
-                          //request.flash('success', 'Ми надіслали Вам реєстраційну інформацію на електронну пошту. Будь ласка, перевірте Ваші вхідні листи.');
-                          request.flash('success', `Запит на реєстрацію облікового запису \"${doc.email}\" прийнято. Вам надіслано листа. \n Щоб завершити реєстрацію облікового запису, перейдіть за посиланням у листі \"Підтвердити реєстрацію\".`);
-                          return response.redirect('/admin_panel');
-                  });
-               
-                };
-
-              getUserId();
-              
-          });
-
-      }else{
+            })
+            .catch (err => {
+                console.error(err);
+                return response.status(500).json({
+                    success: false,
+                    message: 'Помилка сервера: ' + err.message
+                });
+           });
+        }
+        else{
           console.log('defined')
           request.body.email = null;
           // Повідомляємо що користувач вже існує в системі 
-          return response.render('registration', {                
-              page:'Home', 
-              menuId:'home',                     
-              data: request.body, // { email }
-              errors: {
-                  // email: { msg: 'This e-mail address is already registered!' } // Message for email
-                  email: { msg: 'Ця електронна адреса вже зареєстрована!' } // Message for email
-              },
-              csrfToken:tokens.create(secret)
-         })
-      }
-
-    });
-}
-
-var forgotPassword = function (req, res){
-
-    User.findOne({email: req.body.email},(err, doc)=>{        
-    
-        if(err){
-            console.log(err);  
-            // return res.render('error',{message: 'Unable connect to database!', error:err});
-            return res.render('error',{message: 'Неможливо підключитися до бази даних!', error:err});
+          return response.status(400).json({
+            success: false,
+            message: 'Ця електронна адреса вже зареєстрована!',
+          });
         }
-        if (!doc){
-            console.log('doc - undefined');
-            // Error! Make flash message!
-            // req.flash('error', 'User with the specified e-mail is not registered on this site!');
-            req.flash('error', 'Користувач із зазначеним e-mail не зареєстрований на цьому сайті!');
-            return res.redirect('/forgot_password');//res.render('forgot_password',{page:'Home', menuId:'home'});
-        } 
-        
-        // Якщо користувача знайдено – генеруємо токен для скидання пароля
-
-        var FORGOT_SECRET = Buffer.from(sha256(f_tokensecret, tokensalt).passwordHash).toString('base64');
-        console.log(FORGOT_SECRET);
-        
-        var index =  doc._id;
-
-        // sync making forgotToken
-        var forgotToken = jwt.sign({user:`${index}`}, FORGOT_SECRET);
-                          
-        console.log(forgotToken)
-
-        User.updateOne({email: req.body.email},{$set:{token:forgotToken}},{upsert:true},(err,doc) =>{
-            
-            if(err){
-                console.log(err);  
-                // return res.render('error',{message: 'Unable connect to database!', error:err});
-                return res.render('error',{message: 'Неможливо підключитися до бази даних!', error:err});                
-            }
-            if (!doc){
-                console.log('doc - undefined');
-                // Error! Make flash message!
-                //req.flash('error', 'User with the specified e-mail is not registered on this site!');
-                req.flash('error', 'Користувач із зазначеним e-mail не зареєстрований на цьому сайті!');                
-                return res.redirect('/forgot_password');//res.render('forgot_password',{page:'Home', menuId:'home'});
-            } 
-
-        });
-
- 
-        //const url = `https://rro.ics-market.com.ua/change_password/${forgotToken}`;
-        //const url = `https://${getIPAddress()}/change_password/${forgotToken}`;
-        const url = `http://${getIPAddress()}:3000/change_password/${forgotToken}`;
-                
-        // надіслати листа з паролем на e-mail
-        var nodemailer = require('nodemailer');
-
-        var transporter = nodemailer.createTransport({
-            name: "ics-market.com.ua",
-            // service: 'gmail',
-            host: "smtp-relay.gmail.com", //"smtp.gmail.com",  
-            port: 465,
-            secure: true,
-            pool: true,
-            // auth: {
-            //     user: 'd.vasilenko@ics-market.com.ua',
-            //     pass: 'grubzpmnpwhgxsbb'
-            // }
-        });
-
-        var mailOptions = {
-            from:  'rro@ics-market.com.ua',//'rro@ics-market.com.ua',
-            to: req.body.email,
-            subject: 'Відновлення доступу на сайт: https://rro.ics-market.com.ua',
-            html:   `<p align="center"><b> Доброго дня, шановний(-а) ${doc.username} '!</b></p><br><br>`+
-
-                    'Вам було надіслано цей лист, оскільки Ви були зареєстровані на сайті <b>https://rro.ics-market.com.ua</b>.<br>' +
-                    '<b> Якщо Ви не заходили на сайт та не намагалися відновити свій пароль, будь ласка, проігноруйте цей лист.</b><br><br>'+
-
-                    `Для відновлення пароля доступу на сайт, будь ласка, перейдіть за посиланням: <a href="${url}"> Відновити пароль </a><br><br>`+
-
-                    'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br><br>'+
-                    
-                    'З повагою, Адміністрація сайту.'
-        };
-               
-        transporter.sendMail(mailOptions, function(error, info){
-            if (error) {
-                console.log(error);
-                req.flash('error', error);
-                return res.redirect('/forgot_password');
-//                res.render('forgot_password',{page:'Home', menuId:'home'})
-                     
-            } else {
-                console.log('Email sent: ' + info.response);
-            }
-        });
-                 
-        // Success! Make flash message!
-        // req.flash('success', 'We have sent you an email. Please check your e-mail box.');
-        req.flash('success', 'Ми надіслали Вам листа. Будь ласка, перевірте Вашу елекронну пошту.');
-        return res.redirect('/forgot_password');
-        //res.render('forgot_password',{page:'Home', menuId:'home'});
     });
 }
+
+/**
+    * Функція відновлення пароля користувача за e-mail.
+    * @function
+    * @param {object} request - Об'єкт запиту, що містить дані користувача для відновлення пароля.
+    * @param {object} response - Об'єкт відповіді, що буде використаний для надсилання результатів.    *  
+ */
+
+var forgotPassword = function (request, response){
+       
+    User.findOne({email: request.body.email})
+    
+        .then((doc) => {        
+            if (!doc || !doc._id) {
+                console.log('Користувач з таким e-mail не зареєстрований у системі!');
+                return response.status(400).json({
+                    success: false,
+                    message: 'Користувач з таким e-mail не зареєстрований у системі!',
+                });
+            }
+
+            // Якщо користувача знайдено – генеруємо токен для скидання пароля
+            var FORGOT_SECRET = Buffer.from(sha256(f_tokensecret, tokensalt).passwordHash).toString('base64');
+            console.log(FORGOT_SECRET);
+        
+            var index =  doc._id;
+
+            // sync making forgotToken
+            var forgotToken = jwt.sign({user:`${index}`}, FORGOT_SECRET);
+                          
+            console.log(forgotToken)
+
+            // Зберігаємо токен у базі даних для користувача
+            User.updateOne({email: request.body.email},{$set:{token:forgotToken}},{upsert:true})
+                .then((result) => {
+            
+                    if (!result || result.nModified === 0) {
+                        console.log('Користувач з таким e-mail не зареєстрований у системі!');
+                        return response.status(400).json({
+                            success: false,
+                            message: 'Користувач з таким e-mail не зареєстрований у системі!',
+                        });
+                    }
+
+                    // const url = `http://${getIPAddress()}:3000/change_password/${forgotToken}`;
+                    const url = `${process.env.URL_PREFIX}/change_password/${forgotToken}`; 
+                    var mailOptions = {
+                        from:  process.env.EMAIL_SENDER,
+                        to: request.body.email,
+                        subject:'Відновлення доступу на сайт: https://retailbox-prro.ics-market.com.ua',
+                        html:   `<p align="center"><b> Доброго дня, шановний(-а) ${doc.username} '! </b></p><br><br>`+
+
+                            'Вам надіслано цей лист, оскільки Ви зареєстровані на сайті <b>https://retailbox-prro.ics-market.com.ua</b>.<br>' +
+                            '<b> Якщо Ви не заходили на сайт та не намагалися відновити свій пароль, проігноруйте цей лист або видаліть його.</b><br><br>'+
+                
+                            `<div style="text-align:center"><a href="${url}" style="display:inline-block;padding:10px 12px;background:#1a73e8;color:#ffffff;text-decoration:none;border-radius:4px;">Відновити пароль</a></div><br><br>`+
+
+                            'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br>'+
+                            'З повагою, адміністрація ПРРО "RetailBox", ТОВ "ІКС-Маркет".<br>'+
+                            '<div style="text-align:left"><img src="cid:logo@ics" alt="Logo" style="max-width:64px;margin-bottom:10px;"></div>',
+                        attachments: [{ filename: 'logo.jpg', path: path.join(__dirname, 'icons', 'logo.jpg'), cid: 'logo@ics' }]
+                    };
+               
+               
+                    return mailer.sendMail(mailOptions)
+                        .then(() => response.status(200).json({
+                            success: true,
+                            message: 'Вам надіслано листа, перейдіть за посиланням у ньому для відновлення пароля!!'
+                        }))
+                        .catch(err => {
+                            console.log(err);
+                            return response.status(400).json({
+                                success: false,
+                                message: 'Помилка надсилання листа на e-mail користувача: ' + err.message,
+                            });
+                        });
+               
+                })
+                .catch((err) => {
+                    console.error(err);
+                    return response.status(500).json({
+                        success: false,
+                        message: 'Помилка сервера: ' + err.message
+                    });
+                });
+
+        })
+        .catch(err => {
+            console.error(err);
+            return response.status(500).json({
+                success: false,
+                message: 'Помилка сервера: ' + err.message
+            });
+        });
+
+}
+ 
+/**
+    * Функція підтвердження нового користувача за jwt-токеном підтвердження, що надісланий на e-mail користувача.
+    * @function
+    * @param {string} id - Ідентифікатор користувача у базі даних.
+    * @param {object} req - Об'єкт запиту, що містить дані користувача для підтвердження.
+    * @param {object} res - Об'єкт відповіді, що буде використаний для надсилання результатів.
+ */
 
 var confirmNewUser = function (id, req, res){
 
@@ -505,99 +461,59 @@ var confirmNewUser = function (id, req, res){
     // Пошук у базі та зміна статусу користувача за кодом:
     // Змінюємо статус підтвердження реєстрації користувача.
     // Заносимо дату реєстрації користувача.
-    // Записуємо зміни до документа
-    FmUser.findByIdAndUpdate(id,{confirmed: true, regdate: localDate},{useFindAndModify:false},(err, doc)=>{
-    
-        if(err){
-            console.log(err);  
-            // return res.render('error',{message: 'Unable connect to database!', error:err});
-            return res.render('error',{message: 'Неможливо підключитися до бази даних!', error:err});
-        }
+    // Записуємо зміни до бази даних. Після цього користувач може увійти на сайт.
+
+    var query = FmUser.findByIdAndUpdate(id,{confirmed: true, regdate: localDate},{useFindAndModify:false});
+
+    query.then(function(doc) {
         if (!doc){
             console.log('doc - undefined');
-            // return res.render('error',{message: 'User not found!', error:'Error: This user not registered in users database!'});
-            return res.render('error',{message: 'Користувач не знайдений!', error:'Помилка: користувач не зареєстрований у базі даних!'});
-        } 
+            return res.status(400).json({
+                success: false,
+                message: 'Користувача не знайдено!',
+            });
+        }
+        else{
 
-        // надіслати листа з паролем на e-mail
-        var nodemailer = require('nodemailer');
+            const url = `${process.env.URL_PREFIX}`;
+ 
+            var mailOptions = {
+                from: process.env.EMAIL_SENDER,
+                to: doc.email,
+                subject:'Успішне завершення реєстрації на сайті: https://retailbox-prro.ics-market.com.ua',
+                html:   '<p align = "center"><b> Вітаємо Вас, шановний(-а) '+ doc.username + '!</b></p><br><br>'+
 
-        var transporter = nodemailer.createTransport({
-            name: "ics-market.com.ua",
-                //service: 'gmail',
-            host: "smtp-relay.gmail.com",//"smtp.gmail.com",
-            port: 465,
-            secure: true,
-            pool: true,
-                //auth: {
-                //  user: 'd.vasilenko@ics-market.com.ua',
-                //  pass: 'grubzpmnpwhgxsbb'
-                //}
+                        'Раді Вам повідомити, що Ви успішно підтвердили свою реєстрацію в електронному кабінеті на сайті \"https://retailbox-prro.ics-market.com.ua\". <br><br>' +
+                                     
+                        `<div style="text-align:center"><a href="${url}" style="display:inline-block;padding:10px 12px;background:#1a73e8;color:#ffffff;text-decoration:none;border-radius:4px;">Вхід у сервіс</a></div><br><br>`+
+                                                                         
+                        'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br>'+
+                        'З повагою, адміністрація ПРРО "RetailBox", ТОВ "ІКС-Маркет".<br>'+
+                        '<div style="text-align:left"><img src="cid:logo@ics" alt="Logo" style="max-width:100px;margin-bottom:10px;"></div>',                      
+                attachments: [{ filename: 'logo.jpg', path: path.join(__dirname, 'icons', 'logo.jpg'), cid: 'logo@ics' }]
+            };
+
+            mailer.sendMail(mailOptions).catch(function(err){
+                if (err) {
+                    console.log(err);
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Помилка надсилання листа на e-mail користувача: '+ err.message,
+                    });
+                }
+            });
+
+            console.log('Користувач підтверджений: ' + doc.username + ' (' + doc.email + ')');
+            return res.json({success: true, message: 'Користувач успішно підтверджений.'});
+        }
+
+    }).catch(function(err) {
+        console.log("Помилка: " + err);  
+        return res.status(400).json({   
+            success: false,
+            message: err,
         });
-
-        var mailOptions = {
-            from: 'rro@ics-market.com.ua',
-            to: doc.email,
-            subject: 'Успішне завершення реєстрації на сайті: https://rro.ics-market.com.ua',
-            html:    '<p align = "center"><b> Доброго дня, шановний(-а) '+ doc.username + '!</b></p><br><br>'+
-
-                     'Адміністратор сайту \"https://rro.ics-market.com.ua\" підтвердив Ваш обліковий запис. <br>' +                     
-                     'Нагадуємо, що Ви можете самостійно змінити пароль доступу, виданий адміністратором, прямо на сайті! <br>' +
-                     'Бажаємо Вам приємної роботи!<br><br>'+
-
-                     'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br><br>'+
-                     
-                     'З повагою, Адміністрація сайту.'
-        };
-
-        transporter.sendMail(mailOptions, function(err, info){
-            if (err) {
-                console.log(err);
-            }
-        });
-
-        var maillist =['registration@ics-market.com.ua'];
-        User.find({isAdmin: true}). then( doc => {
-
-          if (doc!=null){
-              doc.forEach(function(account){
-                  maillist.push(account.email);
-              })
-          }
-        });
-
-        let mail_context =  '<p align = "center"><b> Доброго дня, шановний(-а) адміністратор сайту \"https://rro.ics-market.com.ua\"!</b></p><br><br>';
-
-        // Якщо користувач не в поточній сесії, тоді 
-        if (req.session.passport === undefined) 
-      
-            mail_context += 'Один із адміністраторів ';
-        else    
-            mail_context += `Aдміністратор ${req.session.passport.user.username} (e-mail: ${req.session.passport.user.email}) <br>`;  
-            
-        mail_context +=  'успішно підтвердив реєстрацію користувача ' +doc.username+ ' на сайті: https://rro.ics-market.com.ua.<br>' +
-                         'Лист про активацію облікового запису вже надіслано на зареєстрований e-mail: ' +doc.email+' !<br><br>'+
-
-                         'Це повідомлення було надіслано Вам автоматично, так як Ви є членом групи адміністраторів сайту.';
-
-        mailOptions = {
-            from: 'rro@ics-market.com.ua',            
-            to: maillist,//'registration@ics-market.com.ua',
-            subject: 'Успішне завершення реєстрації на сайті: https://rro.ics-market.com.ua',
-            html:    mail_context
-        };
-
-        transporter.sendMail(mailOptions, function(err, info){
-            if (err) {
-                console.log(err);
-            }
-        });
-
-        // req.flash('success', 'Congratulation! Your e-mail was successfully confirmed.');
-        req.flash('success', 'Вітаємо! Адреса електронної пошти була успішно підтверджена.');
-        return res.redirect('/admin_panel');              
-        
-    });
+    });  
 }
 
 var updateFirmwaresData = function (mongoose_model,req, res){
@@ -838,7 +754,7 @@ var removeDevices = function (mongoose_model,req, res){
     });
 }
 
-var verifyToken = function(req, res){
+var verifyToken = async function(req){
 
     var FORGOT_SECRET = Buffer.from(sha256(f_tokensecret, tokensalt).passwordHash).toString('base64');
             
@@ -847,122 +763,121 @@ var verifyToken = function(req, res){
     var id = decoded.user;
     //const FmUser = require('./models/fmuser');
     
-    FmUser.findById(id,(err, doc)=>{
+    const doc = await FmUser.findById(id);
+    if (!doc || !doc._id) {
+        console.log('Користувача не знайдено!');
+        return {
+            success: false,
+            message: 'Користувача не знайдено!'
+        };
+    }
 
-        if(err){
-            console.log(err);  
-            // return res.render('error',{message: 'Unable connect to database!', error:err});
-            return res.render('error',{message: 'Неможливо підключитися до бази даних!', error:err});
-        }
-        if (!doc){
-            console.log('doc - undefined');
-            // return res.render('error',{message: 'User not found!', error:'Error: This user not registered in users database!'});
-            return res.render('error',{message: 'Користувач не знайдений', error: 'Помилка: користувач не зареєстрований у базі даних!'});
-        } 
-        
-        console.log('from db: '+ doc.token);
-        console.log('from mail: '+ req.params.token);
-        var tokenEqual = false;
-        if (doc.token === req.params.token){
-            tokenEqual = true;
-        }
+    console.log('from db: '+ doc.token);
+    console.log('from mail: '+ req.params.token);
+    const tokenEqual = doc.token === req.params.token;
 
-        FmUser.findByIdAndUpdate(id,{$unset: {token: ''}},{useFindAndModify:false},(err, doc)=>{
+    if (!tokenEqual) {
+        return {
+            success: false,
+            message: 'Помилка: невірний токен користувача!',
+            error: 'Помилка: невірний токен користувача!'
+        };
+    }
 
-            if(err){
-                console.log(err);  
-                // return res.render('error',{message: 'Unable connect to database!', error:err});
-                return res.render('error',{message: 'Неможливо підключитися до бази даних!', error:err});
-            }
+    const updatedDoc = await FmUser.findByIdAndUpdate(id, {$unset: {token: ''}}, {useFindAndModify:false});
 
-            if (!doc){
-                console.log('doc - undefined');
-                // return res.render('error',{message: 'User not found!', error:'Error: This user not registered in users database!'});
-                return res.render('error',{message: 'Користувач не знайдений!', error: 'Помилка: користувач не зареєстрований у базі даних!'});
-            } 
-            
-        });
+    if (!updatedDoc) {
+        console.log('doc - undefined');
+        return {
+            success: false,
+            message: 'Користувача не знайдено!',
+            error: 'Помилка: користувача не знайдено!'
+        };
+    }
 
-        if (tokenEqual)
-            return res.render('change_password',{page:'Home', menuId:'home', jwt:req.params.token, errors:{}, csrfToken:tokens.create(secret)});
-        else{
-            // req.flash('error','Error: bad user token!');
-            req.flash('error', 'Помилка: невірний токен користувача!');
-            return res.redirect('/forgot_password');
-        }
-    });
+    return {
+        success: true,
+        message: 'Токен користувача підтверджено!',
+        jwt: req.params.token,
+        userId: id
+    };
 }
 
-var changePassword = function(req, res){
-    var token =  String(req.body.jwt);
-    console.log('body token: '+ token);
-    var FORGOT_SECRET = Buffer.from(sha256(f_tokensecret, tokensalt).passwordHash).toString('base64');
-            
-    const decoded = jwt.verify(token, FORGOT_SECRET);
-    console.log(decoded.user);
-    var id = decoded.user;
-    console.log('_id = '+id);    
+/**
+    * Функція зміни пароля користувача у базі даних.
+    * @function 
+    * @param {object} request - Об'єкт запиту, що містить дані користувача для зміни пароля.
+    * @param {object} response - Об'єкт відповіді, що буде використаний для надсилання результатів.
+    * @returns {void} - Не повертає значення, результат надсилається через об'єкт response.
+ */
+
+var changePassword = function(request, response){
+
+    var id = request.params.userId;
 
     // Generate HASH 
     var salt = genRandomString(16);
-    var passwordData = sha512(req.body.password, salt);
+    var passwordData = sha512(request.body.newPassword, salt);
     //const FmUser = require('./models/fmuser');
-    FmUser.findByIdAndUpdate(id,{hash: passwordData},{useFindAndModify:false},(err, doc)=>{
-    
-        if(err){
-            console.log(err);  
-            // return res.render('error',{message: 'Unable connect to database!', error:err});
-            return res.render('error',{message: 'Неможливо підключитися до бази даних!', error:err});
-        }
-        if (!doc){
-            console.log('doc - undefined');
-            // return res.render('error',{message: 'User not found!', error:'Error: This user not registered in users database!'});            
-            return res.render('error',{message: 'Користувач не знайдений!', error: 'Помилка: користувач не зареєстрований у базі даних!'});
-        } 
-
-        // надіслати листа з паролем на e-mail
-        var nodemailer = require('nodemailer');
-
-        var transporter = nodemailer.createTransport({
-            name: "ics-market.com.ua",
-            // service: 'gmail',
-            host: "smtp-relay.gmail.com", //"smtp.gmail.com",
-            port: 465,
-            secure: true,
-            pool: true,
-            // auth: {
-            //     user: 'd.vasilenko@ics-market.com.ua',
-            //     pass: 'grubzpmnpwhgxsbb'
-            // }
-        });
-
-        var mailOptions = {
-            from: 'rro@ics-market.com.ua',
-            to: doc.email,
-            subject: 'Успішна зміна пароля доступу на сайт: https://rro.ics-market.com.ua',
-            html:    '<p align="center"><b> Доброго дня, шановний(-а) '+ doc.username + '!</b></p><br><br>'+
-
-                                      'Ви успішно змінили свій пароль на сайті https://rro.ics-market.com.ua. <br>' +
-                                      'Ваш новий пароль: <b>'+ req.body.password + '</b><br><br>' +                                    
-                                      
-                                      'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br><br>' +
-                                      
-                                      'З повагою, Адміністрація сайту.'
-         };
-
-        transporter.sendMail(mailOptions, function(err, info){
-            if (err) {
-                console.log(err);
+    FmUser.findByIdAndUpdate(id,{hash: passwordData},{useFindAndModify:false})
+        .then(doc=>{
+            if (!doc) {
+                return response.status(400).json({
+                    success: false,
+                    message: 'Користувача не знайдено!'
+                });
             }
-        });
 
-        // req.flash('success', 'Congratulation! Your new password was succesfully saved.');
-        req.flash('success', 'Вітаємо! Ваш новий пароль успішно збережено.');
-        return res.redirect('/');               
-        
-    });
+            const url = `${process.env.URL_PREFIX}`;
+            
+            var mailOptions = {
+                from: process.env.MAIL_SENDER,
+                to: doc.email,
+                subject:'Успішна зміна пароля доступу на сайті: https://retailbox-prro.ics-market.com.ua',
+                html:   '<p align="center"><b> Вітаємо Вас, шановний(-а) '+ doc.username + '!</b></p><br><br>'+
+
+                        'Повідомляємо Вам, що Ви успішно змінили свій пароль на сайті https://retailbox-prro.ics-market.com.ua. <br>' +
+                        'Ваш новий пароль: <b>'+ request.body.newPassword + '</b><br><br>' +
+                                      
+                        `<div style="text-align:center"><a href="${url}" style="display:inline-block;padding:10px 12px;background:#1a73e8;color:#ffffff;text-decoration:none;border-radius:4px;">Вхід у сервіс</a></div><br><br>`+
+         
+                        'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br>' +
+                        'З повагою, адміністрація ПРРО "RetailBox", ТОВ "ІКС-Маркет".<br>'+
+                        '<div style="text-align:left"><img src="cid:logo@ics" alt="Logo" style="max-width:100px;margin-bottom:10px;"></div>',
+                attachments: [{ filename: 'logo.jpg', path: path.join(__dirname, 'icons', 'logo.jpg'), cid: 'logo@ics' }]
+            };
+
+            return mailer.sendMail(mailOptions)
+                .then(()=> response.status(200).json({
+                    success: true,
+                    message: 'Вітаємо! Ваш новий пароль успішно збережено.'
+                }))
+                .catch(err => {
+                    console.log(err);
+                    return response.status(400).json({
+                        success: false,
+                        message: 'Помилка надсилання листа на e-mail користувача: ' + err.message,
+                    });
+                });               
+
+        })
+        .catch( err=>{
+            console.error(err);
+            return response.status(500).json({
+                success: false,
+                message: 'Помилка сервера: ' + err.message
+            });
+
+        })
 }
 
+/**
+    * Функція перевірки пароля користувача.
+    * @function
+    * @param {string} password - Пароль користувача для перевірки.
+    * @param {object} hash - Об'єкт, що містить хеш пароля та сіль користувача.
+    * @return {boolean} - Повертає true, якщо пароль збігається з хешем, інакше false.
+ */
 
 var verifyPassword = function(password, hash){
     var passwordData = sha512(password, hash.salt);
@@ -984,7 +899,7 @@ var verifyPassword = function(password, hash){
 //             // if (typeof doc === 'undefined'){
 //                 console.log('email - undefined');
 //                 // request.flash('error', 'User not found!');
-//                 request.flash('error', 'Користувач не знайдений!');
+//                 request.flash('error', 'Користувача не знайдено!');
 //                 return response.redirect('/');
 
 //         }
@@ -1032,10 +947,15 @@ app.use('/images',express.static(path.join(__dirname + '/views/public/images')))
 app.use(cookieParser());
 app.use(session({
     secret: 'super-secret-key',
-    key: 'super-secret-cookie',
+    name: 'retailbox.sid',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 30 * 60 * 1000 }  // 30 min
+    cookie: {
+        maxAge: 30 * 60 * 1000,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    }
   }));
 app.use(flash());
 //app.use(csrf({cookie:true}));
@@ -1045,11 +965,25 @@ const csrfProtection = csrf({
   cookie: {
     httpOnly: true, // токен нельзя прочитать из JS
     secure: false,  // true для HTTPS
-    sameSite: 'strict' // защита от CSRF
-  }
+    sameSite: 'strict', // защита от CSRF
+    maxAge: 18000  // 30 минут в секундах
+  },
+  ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] // игнорируемые методы, для которых CSRF-токен не проверяется
 });
 
-app.use(csrfProtection);
+app.use((req, res, next) => {
+  // Пропускаем GET-запросы на /confirm и /change_password без проверки CSRF  
+  if (req.method === 'GET' && (req.path.startsWith('/confirm') || req.path.startsWith('/change_password'))) {
+    return next();
+  }
+  csrfProtection(req, res, next);
+});
+
+// Разрешаем CORS для фронтенда
+app.use(cors({
+  origin: 'http://localhost:5173', // адрес React-приложения
+  credentials: true
+}));
 
 passport.serializeUser(function(user, done) {
     done(null, user);
@@ -1177,7 +1111,6 @@ passport.deserializeUser(function(obj, done) {
   }
 ));
 
-app.use(require('express-session')({ secret: 'keyboard cat', resave: true, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
 //app.use(passport.authenticate('remember-me',{failureRedirect:'/sign-in'}));
@@ -1241,17 +1174,23 @@ else
  * /csrf-token:
  *  get:
  *    summary: Получение CSRF-токена
- *   description: Возвращает CSRF-токен для защиты от CSRF-атак.
- *   tags:
- *     - Security
- *  responses:
- *    200:
- *     description: Успешно возвращен CSRF-токен.
- *  
- *  
+ *    description: Возвращает CSRF-токен для защиты от CSRF-атак.
+ *    tags:
+ *      - Security
+ *    responses:
+ *      200:
+ *        description: Успешно возвращен CSRF-токен.
+ *    content:
+ *      application/json:
+ *      schema:
+ *        type: object
+ *        properties:
+ *          csrfToken:
+ *            type: string 
  */
+
 app.get('/csrf-token', (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
+  res.json({ csrfToken: req.csrfToken()});
 });
 
 
@@ -2182,60 +2121,39 @@ app.get('/rro_flasher', function(req,res){
     }
 });
 
-
+  
 /**
  * @openapi
- * /registration:
- *   get:
- *     summary: Отображение страницы регистрации
- *     description: Возвращает страницу регистрации нового пользователя.
- *     tags:
- *       - Authentication
- *     responses:
- *       200:
- *         description: Страница регистрации успешно отдана.
- */
-app.get('/registration', urlencodedParser, function(req,res){
-    // console.log(req.csrfToken());
-    // var token = req.csrfToken();
-    //  res.cookie ( 'CSRF-TOKEN', token)
-   
-    return res.render('registration',{page:'Home', menuId:'home', data:{}, errors:{}, csrfToken:tokens.create(secret)});
-    // res.render('registration',{page:'Home', menuId:'home', data:{}, errors:{}});
-});
-   
-/**
- * @openapi
- * /registration:
+ * /register:
  *   post:
  *     summary: Регистрация нового пользователя
  *     description: Создает новую учетную запись пользователя.
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *                 description: Имя пользователя
- *               email:
- *                 type: string
- *                 description: Электронная почта пользователя
- *               password:
- *                 type: string
- *                 description: Пароль пользователя
- *               confirm_password:
- *                 type: string
- *                 description: Подтверждение пароля пользователя
+ *   tags:
+ *     - Authentication
+ *   requestBody:
+ *     required: true
+ *     content:
+ *       application/json:
+ *         schema:
+ *           type: object
+ *           properties:
+ *             username:
+ *               type: string
+ *               description: Имя пользователя
+ *             email:
+ *               type: string
+ *               description: Электронная почта пользователя
+ *             password:
+ *               type: string
+ *               description: Пароль пользователя
+ *             confirm_password:
+ *               type: string
+ *               description: Подтверждение пароля пользователя
  *     responses:
  *       200:
  *         description: Пользователь успешно зарегистрирован.
  */
-app.post('/registration', urlencodedParser,                          
+app.post('/register', urlencodedParser,                          
                             check('username')
                                 .not().isEmpty()
                                 // .isLength({min: 6}).withMessage('Name must have more than 6 characters.'),
@@ -2251,30 +2169,44 @@ app.post('/registration', urlencodedParser,
                                                   icloud_remove_subaddress: false,
                                                   yahoo_remove_subaddress: false }),  
                             // check('password','Please enter a password at least 8 character and contain at least one uppercase, one lower case and one special character.')                                 
-                            check('password','Будь ласка, введіть пароль не менше 8-ми символів, він повинен містити, як мінімум, одну велику та одну маленьку літери, одну цифру та один спеціальний знак (@$_,.—!%*#?&).')      
+                            check('password','Пароль має містити не менше 8-ми символів латиницею, містити одну велику і маленьку літери, цифру та спецсимвол з набору @$_,.—!%*#?& .')
                                 .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$_,.—!%*#?&\-])[a-zA-Z\d@$_,.—!%*#?&\-]{8,}$/, "i"),
                             // check('confirm_password', 'Passwords do not match.').custom((value, {req}) => (value === req.body.password))  
-                            check('confirm_password', 'Паролі не співпадають.').custom((value, {req}) => (value === req.body.password))  
-                                , function (request, response) {
+                            check('confirm_password', 'Паролі не співпадають.').custom((value, {req}) => (value === req.body.password)), 
+                            function (request, response) {
 
-    //console.log(request.csrfToken());
-    if(!request.body) return response.sendStatus(400);
+//    console.log(request.csrfToken());
+    if(!request.body) 
+        return response.sendStatus(400);
+    
     console.log(request.body);
-    if (!tokens.verify(secret, request.body._csrf)){
+    // if (!tokens.verify(secret, request.body._csrf)){
 
-        // return response.status(403).send('form tampered with.');
-        return response.status(403).send('Форма була підроблена.');
-    }
+    //     // return response.status(403).send('form tampered with.');
+    //     return response.status(403).send('Форма була підроблена.');
+    // }
 
     const errors = validationResult(request)
-    if (!errors.isEmpty()){
-      return response.render('registration', {
-          page:'Home', 
-          menuId:'home',  
-          data: request.body,
-          errors: errors.mapped(),
-          csrfToken:tokens.create(secret)})
+    if (!errors.isEmpty()){         
+        const formattedErrors = [];
+        errors.array().forEach(({ msg }) => {
+            formattedErrors.push({text: msg });
+        });   
+
+        console.log(formattedErrors);
+        return response.status(400).json({
+            success: false,
+            message: 'Помилка валідації.',
+            errors: formattedErrors
+        });
     }
+    // return response.render('registration', {
+    //       page:'Home', 
+    //       menuId:'home',  
+    //       data: request.body,
+    //       errors: errors.mapped(),
+    //       csrfToken:tokens.create(secret)})
+    // }
 
     if (mainconnection.readyState == 1){
        registerNewUser(request,response);
@@ -2282,41 +2214,73 @@ app.post('/registration', urlencodedParser,
     else{
         console.log('error connection to mongo server!');
         // return response.render('error',{message: 'Server connection error!'});
-        return response.render('error',{message: 'Помилка підключення до сервера!'});
+        return response.sendStatus(500).json({
+            success: false,
+            message: 'Помилка підключення до сервера!'
+        });
     }
    
-    User.username = request.body.username;
-    User.email = request.body.email;
-    var salt = genRandomString(16);
-    var passwordData = sha512(request.body.password, salt);
-    User.hash = passwordData;
+
+    // User.username = request.body.username;
+    // User.email = request.body.email;
+    // var salt = genRandomString(16);
+    // var passwordData = sha512(request.body.password, salt);
+    // User.hash = passwordData;
 });
 
-app.get('/confirmation/:token', urlencodedParser, function (req,res) {
+/**
+ * @openapi
+ * /confirm/{token}:
+ *   get:
+ *     summary: Подтверждение электронной почты пользователя
+ *     description: Подтверждает адрес электронной почты пользователя с помощью токена.
+ *   tags:
+ *     - Authentication
+ *   parameters:
+ *     - name: token
+ *       in: path
+ *       description: Токен подтверждения электронной почты
+ *       required: true
+ *       schema:
+ *         type: string
+ *    
+ *   responses:
+ *     200:
+ *       description: Адрес электронной почты успешно подтвержден.   
+ */
+
+app.get('/confirm/:token', urlencodedParser, function (request, response) {
     try{
-        console.log(req.params.token);
+        //console.log(req.params.token);
         var EMAIL_SECRET = Buffer.from(sha256(tokensecret, tokensalt).passwordHash).toString('base64');
                 
-        const decoded = jwt.verify(req.params.token, EMAIL_SECRET);
-        console.log(decoded.user);
+        const decoded = jwt.verify(request.params.token, EMAIL_SECRET);
+        // console.log(decoded.user);
         var id = decoded.user;
-        console.log('_id = '+id);    
+        //console.log('_id = '+id);    
        
         if (mainconnection.readyState == 1){
-            confirmNewUser(id, req, res);
+            confirmNewUser(id, request, response);
         }  
         else{
             console.log('error connection to mongo server!');
             // return res.render('error',{message: 'Server connection error!'});
-            return res.render('error',{message: 'Помилка підключення до сервера!'});
+            return response.sendStatus(500).json({
+                success: false,
+                message: 'Помилка підключення до сервера!'
+            });
         }
      
     } catch (err){
         // return res.render('error',{message: 'E-mail confirmation error!'});
-        return res.render('error',{message: 'Помилка підтвердження e-mail!'});
+        return response.sendStatus(500).json({
+            success: false,
+            message: 'Помилка підтвердження e-mail!'
+        });
     }    
 });
    
+
 app.post('/sign-in', urlencodedParser, passport.authenticate('local', {failureRedirect: '/sign-in', failureFlash: true}),
     function(req, res, next) {        
         console.log('enter to function!');
@@ -2381,14 +2345,29 @@ app.post('/sign-in', urlencodedParser, passport.authenticate('local', {failureRe
     }
 );  
  
- // Forgot password
-app.get('/forgot_password', urlencodedParser, function(req,res){
-    
-   return res.render('forgot_password',{page:'Home', menuId:'home'});
-
-});
-
-app.post('/forgot_password', urlencodedParser, check('email')
+/**
+ * @openapi
+ * /forgot:
+ *   post:
+ *     summary: Восстановление пароля пользователя
+ *     description: Отправляет электронное письмо с инструкциями по восстановлению пароля пользователя.
+ *   tags:
+ *     - Authentication
+ *   requestBody:
+ *     required: true
+ *     content:
+ *       application/json:
+ *       schema:
+ *         type: object
+ *         properties:
+ *           email:
+ *             type: string
+ *             description: Электронная почта пользователя
+ *   responses:
+ *     200:
+ *       description: Электронное письмо с инструкциями по восстановлению пароля успешно отправлено.
+ */
+app.post('/forgot', urlencodedParser, check('email')
                                                 .isEmail()
                                                 //.withMessage('That email doesn‘t look right')
                                                 .withMessage('Невірний e-mail.')
@@ -2398,58 +2377,80 @@ app.post('/forgot_password', urlencodedParser, check('email')
                                                                   outlookdotcom_remove_subaddress: false,
                                                                   icloud_remove_subaddress: false,
                                                                   yahoo_remove_subaddress: false }),  
-                                                function (req, res) {
+                                                function (request, response) {
     if (mainconnection.readyState == 1){
-        forgotPassword(req,res);
+        forgotPassword(request,response);
     } 
     else{
         console.log('error connection to mongo server!');
         // return res.render('error',{message: 'Server connection error!'});
-        return res.render('error',{message: 'Помилка підключення до сервера!'});
+        return response.status(500).json({
+            success: false,
+            message: 'Помилка підключення до сервера!'
+        });
     }                                                                                                                                              
 });
 
-app.get('/change_password/:token', urlencodedParser, function (req, res) {
-    console.log(req.params.token); 
+app.post('/change_password/:token', urlencodedParser,                          
+                                      // check('password','Please enter a password at least 8 character and contain at least one uppercase, one lower case and one special character.')   
+                                       check('newPassword','Пароль має містити не менше 8-ми символів латиницею, містити одну велику і маленьку літери, цифру та спецсимвол з набору @$_,.—!%*#?& .')
+                                          .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$_,.—!%*#?&\-])[a-zA-Z\d@$_,.—!%*#?&\-]{8,}$/, "i"),
+                                      async function (request, response) {
+  
+
+    if(!request.body) 
+        return response.sendStatus(400);
+    
+    console.log(request.body);
+    // if (!tokens.verify(secret, request.body._csrf)){
+    //     // return response.status(403).send('form tampered with');
+    //     return response.status(403).send('Форма була підроблена.');
+    // }
+
+    const errors = validationResult(request)
+    if (!errors.isEmpty()){         
+        const formattedErrors = [];
+        errors.array().forEach(({ msg }) => {
+            formattedErrors.push({text: msg });
+        });   
+
+        console.log(formattedErrors);
+        return response.status(400).json({
+            success: false,
+            message: 'Помилка валідації.',
+            errors: formattedErrors
+        });
+    }   
 
     if (mainconnection.readyState == 1){
-        verifyToken(req,res);
+        try {
+            const result = await verifyToken(request);
+            if (result && result.success) {
+                if (result.userId) {
+                    request.params.userId = result.userId;
+                    return changePassword(request, response);
+                }
+                else {
+                    return response.status(400).json({ 
+                        success: false, 
+                        message: 'Невірний токен або користувач не знайдений.' 
+                    });
+                }
+                
+            }
+            return response.status(400).json(result);
+        } catch (err) {
+            console.error(err);
+            return response.status(500).json({ success: false, message: 'Помилка сервера: ' + err.message });
+        }
     }
     else{
         console.log('error connection to mongo server!');
         // return res.render('error',{message: 'Server connection error!'});
-        return res.render('error',{message: 'Помилка підключення до сервера!'});
-    }                                                                                               
-});
-
-app.post('/change_password', urlencodedParser,                          
-                             // check('password','Please enter a password at least 8 character and contain at least one uppercase, one lower case and one special character.')   
-                             check('password','Будь ласка, введіть пароль не менше 8-ми символів, він повинен містити, як мінімум, одну велику та одну маленьку літери, одну цифру та один спеціальний знак (@$_,.—!%*#?&).')                                                              
-                                .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@$_,.—!%*#?&\-])[a-zA-Z\d@$_,.—!%*#?&\-]{8,}$/, "i"),
-                             // check('confirm_password', 'Passwords do not match.').custom((value, {req}) => (value === req.body.password))  
-                             check('confirm_password', 'Паролі не співпадають.').custom((value, {req}) => (value === req.body.password))  
-                                , function (req, res) {
-
-    if(!req.body) return res.sendStatus(400);
-    console.log(req.body);
-    if (!tokens.verify(secret, req.body._csrf)){
-        // return res.status(403).send('form tampered with');
-        return res.status(403).send('Форма була підроблена.');
-    }
-            
-    const errors = validationResult(req)
-    if (!errors.isEmpty()){
-        console.log('jwt - '+ req.body.jwt);
-        return res.render('change_password',{page:'Home', menuId:'home', jwt:req.body.jwt, errors: errors.mapped(), csrfToken:tokens.create(secret)})
-    }
-
-    if (mainconnection.readyState == 1){
-        changePassword(req, res);      
-    }
-    else{
-        console.log('error connection to mongo server!');
-        // return res.render('error',{message: 'Server connection error!'});
-        return res.render('error',{message: 'Помилка підключення до сервера!'});        
+        return response.status(500).json({
+            success: false,
+            message: 'Помилка підключення до сервера!'
+        });
     }
 
 });
@@ -2686,7 +2687,10 @@ app.get('/logout', urlencodedParser, function(req,res){
                 if(err) console.error(err);
             });
             res.clearCookie('remember_me');
-            req.session.destroy();
+            req.session.destroy(() => {
+                res.clearCookie('retailbox.sid');
+            });
+            return res.redirect('/sign-in');
         }
 
     return res.redirect('/sign-in');
@@ -2946,7 +2950,7 @@ httpServer.listen(3000, () => {
 //     process.exit();
 //  });    if (mainconnection.readyState == 0){
 
-var mainconnection = mongoose.createConnection(dbConnectionString,{
+var mainconnection = mongoose.createConnection(process.env.DB_CONNECTION_STRING,{
     // useUnifiedTopology: true, 
     // useNewUrlParser: true,
     // // ssl: false,
@@ -3063,20 +3067,6 @@ function checkExpiredDate(){
 function sendWarningLevel(account, days){
 
     console.log('Warning-1: '+account.email);
-    var nodemailer = require('nodemailer');
-
-    var transporter = nodemailer.createTransport({
-        name: "ics-market.com.ua",
-        //service: 'gmail', 
-        host: "smtp-relay.gmail.com", //"smtp.gmail.com",
-        port: 465,
-        secure: true,
-        pool: true,
-        //auth: {
-        //   user: 'd.vasilenko@ics-market.com.ua',
-        //   pass: 'grubzpmnpwhgxsbb'
-        //}
-    });
 
     var user_name = account.email;
     if (account.username!=null)
@@ -3092,25 +3082,30 @@ function sendWarningLevel(account, days){
     var expireDate= moment(account.expireDate,moment.ISO_8601).utc().format('DD-MM-YYYY');
 
     var mailOptions = {
-      from: 'rro@ics-market.com.ua',
-      to: account.email,
-      subject: 'Закінчується термін підписки на послуги сайту \"https://rro.ics-market.com.ua\" ',
-      html:    '<p align = "center"><b> Доброго дня, шановний(-а) '+  user_name + '!</b></p><br><br>'+
+    from: process.env.MAIL_SENDER,
+    to: account.email,
+    subject: 'Закінчується термін підписки на послуги сайту "https://retailbox-prro.ics-market.com.ua" ',
+    html:    '<div style="text-align:center"><img src="cid:logo@ics" alt="Logo" style="max-width:200px;margin-bottom:10px;"></div>' +
 
-               'Нагадуємо Вам, що через '+ str + ' закінчується термін підписки на сервіси сайту https://rro.ics-market.com.ua <br><br>' +
-               '<b>Доступ Вашого облікового запису до сервісів сайту буде припинено '+expireDate+'.</b><br><br>'+               
-               'За умовами та іншими питаннями продовження передплати на наступний період '+
-               'Вам необхідно письмово звернутися до адміністратора сайту: registration@ics-market.com.ua. <br><br>'+
+           '<p align = "center"><b> Доброго дня, шановний(-а) '+  user_name + '!</b></p><br><br>'+
 
-               '<b>Ми дуже сподіваємося, що наші сервіси стали Вам у нагоді і будемо щиро раді продовжити '+
-               'взаємне співробітництво щодо подальшого їх розвитку разом із нашою командою!</b><br><br>'+
+           'Нагадуємо Вам, що через '+ str + ' закінчується термін підписки на сервіси сайту https://rro.ics-market.com.ua <br><br>' +
+           '<b>Доступ Вашого облікового запису до сервісів сайту буде припинено '+expireDate+'.</b><br><br>'+               
+           'За умовами та іншими питаннями продовження передплати на наступний період '+
+           'Вам необхідно письмово звернутися до адміністратора сайту: registration@ics-market.com.ua. <br><br>'+
+ 
+
+           '<b>Ми дуже сподіваємося, що наші сервіси стали Вам у нагоді і будемо щиро раді продовжити '+
+           'взаємне співробітництво щодо подальшого їх розвитку разом із нашою командою!</b><br><br>'+
                
-               'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br><br>'+
+           'Це повідомлення було надіслано Вам автоматично, відповідати на нього не потрібно.<br><br>'+
+ 
+           'З повагою, Адміністрація сайту.',
+    attachments: [{ filename: 'logo.jpg', path: path.join(__dirname, 'icons', 'logo.jpg'), cid: 'logo@ics' }]
 
-               'З повагою, Адміністрація сайту.'
     };
 
-    transporter.sendMail(mailOptions, function(error, info){
+    mailer.sendMail(mailOptions, 'warning').catch(function(error){
         if (error) {
             console.log(error);
         }
